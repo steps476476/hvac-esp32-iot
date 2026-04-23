@@ -3,30 +3,29 @@
 #define DHTPIN 4
 #define DHTTYPE DHT22
 
-#define RELAY 2
-#define BUZZER 15
-#define BUTTON 18
-#define POT 34
+#define BUTTON_PIN 18
+#define RELAY_PIN 2
+#define BUZZER_PIN 15
+#define POT_PIN 34
 
 DHT dht(DHTPIN, DHTTYPE);
 
 volatile bool emergency = false;
-
 float temperature = 0;
 int adcValue = 0;
 
-void IRAM_ATTR emergencyISR() {
+void IRAM_ATTR buttonISR() {
   static unsigned long lastInterrupt = 0;
-  if (millis() - lastInterrupt > 200) { // debounce
+  if (millis() - lastInterrupt > 200) {
     emergency = true;
     lastInterrupt = millis();
   }
 }
 
-void sensorTask(void *pv) {
+void sensor_task(void *pv) {
   while (1) {
     temperature = dht.readTemperature();
-    adcValue = analogRead(POT);
+    adcValue = analogRead(POT_PIN);
 
     Serial.print("Temp: ");
     Serial.print(temperature);
@@ -37,24 +36,24 @@ void sensorTask(void *pv) {
   }
 }
 
-void controlTask(void *pv) {
+void control_task(void *pv) {
   while (1) {
 
     if (emergency) {
-      digitalWrite(RELAY, LOW);
-      digitalWrite(BUZZER, HIGH);
-      Serial.println("EMERGENCY STOP!");
+      digitalWrite(RELAY_PIN, LOW);
+      digitalWrite(BUZZER_PIN, HIGH);
+      Serial.println("EMERGENCY STOP");
     }
 
     else if (temperature > 30) {
-      digitalWrite(RELAY, HIGH);
-      digitalWrite(BUZZER, LOW);
+      digitalWrite(RELAY_PIN, HIGH);
+      digitalWrite(BUZZER_PIN, LOW);
       Serial.println("Cooling ON");
     }
 
     else {
-      digitalWrite(RELAY, LOW);
-      digitalWrite(BUZZER, LOW);
+      digitalWrite(RELAY_PIN, LOW);
+      digitalWrite(BUZZER_PIN, LOW);
       Serial.println("System Idle");
     }
 
@@ -62,12 +61,11 @@ void controlTask(void *pv) {
   }
 }
 
-void safetyTask(void *pv) {
+void safety_task(void *pv) {
   while (1) {
-
     if (temperature > 40) {
-      digitalWrite(RELAY, LOW);
-      digitalWrite(BUZZER, HIGH);
+      digitalWrite(RELAY_PIN, LOW);
+      digitalWrite(BUZZER_PIN, HIGH);
       Serial.println("OVERHEAT SHUTDOWN!");
     }
 
@@ -78,19 +76,19 @@ void safetyTask(void *pv) {
 void setup() {
   Serial.begin(115200);
 
-  pinMode(RELAY, OUTPUT);
-  pinMode(BUZZER, OUTPUT);
-  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(RELAY_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 
   dht.begin();
 
-  attachInterrupt(digitalPinToInterrupt(BUTTON), emergencyISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
 
-
-  xTaskCreate(sensorTask, "Sensor", 2048, NULL, 1, NULL);
-  xTaskCreate(controlTask, "Control", 2048, NULL, 1, NULL);
-  xTaskCreate(safetyTask, "Safety", 2048, NULL, 2, NULL);
+  xTaskCreate(sensor_task, "Sensor", 2048, NULL, 1, NULL);
+  xTaskCreate(control_task, "Control", 2048, NULL, 1, NULL);
+  xTaskCreate(safety_task, "Safety", 2048, NULL, 2, NULL);
 }
 
 void loop() {
+  
 }
